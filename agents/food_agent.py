@@ -91,4 +91,4 @@ def food_agent(state: State):
     food = parse_response(response)
     state["food"] = food.get("food", food.get("food_options", []))
     state["food_cost"] = food.get("food_cost", food.get("food_budget", 0))
-    return state
+    
