@@ -1,30 +1,26 @@
-import json
-import os
+from typing import Any
 
-from dotenv import load_dotenv
-from langchain_ollama import ChatOllama
-from tavily import TavilyClient
-
+from config.settings import (
+    MAX_HOTEL_OPTIONS,
+    TAVILY_MAX_RESULTS,
+)
+from logger import hotel_logger
+from prompts.hotel_prompt import build_hotel_prompt
 from state import State
-
-load_dotenv()
-
-TEMPERATURE = 0.1
-TOP_P = 0.9
-MAX_OUTPUT_TOKENS = 500
-
-tavily = TavilyClient(
-    api_key=os.getenv("TAVILY_API_KEY"),
-)
-
-llm = ChatOllama(
-    model="qwen3:8b",
-    temperature=0,
-)
+from utils.parsers import parse_json_response
 
 
-def search_hotel(state: State):
-    """Search the hotel options from the web."""
+def search_hotel(state: State) -> dict[str, Any]:
+    from clients import get_tavily_client
+
+    hotel_logger.info("=" * 50)
+    hotel_logger.info("Hotel Agent Started")
+    hotel_logger.info("=" * 50)
+    hotel_logger.info(f"Reading state - Destination: {state['destination']}, Budget: {state['budget']}")
+    hotel_logger.info("Search Started")
+
+    tavily_client = get_tavily_client()
+
     query = f"""the best possible hotel for the trip from {state["source"]} to {state["destination"]} for a budget of {state["budget"]} and the travel date is {state["travel_date"]}
 
 Include the following constraints in your search:
@@ -33,58 +29,66 @@ hotel_prices
 hotel_location
 hotel_reviews
 """
-    response = tavily.search(query=query, max_results=10)
+    response = tavily_client.search(query=query, max_results=TAVILY_MAX_RESULTS)
+
+    hotel_logger.info("Search Completed")
+    hotel_logger.info(f"Search returned {len(response.get('results', []))} results")
+
     return response
 
 
-def build_prompt(state: State, search_results):
-    """Build a prompt for the llm model."""
-    prompt = f"""You are an expert travel agent. You have been given the user details, now kindly find the best possible hotel option.
+def build_prompt(state: State, search_results: dict[str, Any]) -> str:
+    hotel_logger.info("Prompt Building Started")
 
-Source:
-{state["source"]}
+    prompt = build_hotel_prompt(
+        source=state["source"],
+        destination=state["destination"],
+        travel_date=state["travel_date"],
+        budget=state["budget"],
+        preferences=state["preferences"],
+        search_results=search_results
+    )
 
-destination:
-{state["destination"]}
-
-travel_date:
-{state["travel_date"]}
-
-Search_results:
-{search_results}
-
-Choose the best possible hotel option for the user according to the details which are provided to you.
-return only JSON results
-
-Format:
-{{
-  "hotel": [],
-  "hotel_cost": 0
-}}
-"""
+    hotel_logger.info("Prompt Building Completed")
     return prompt
 
 
-def ask_llm(prompt):
-    """Send the prompt to the llm."""
+def ask_llm(prompt: str) -> str:
+    from clients import get_llm
+
+    hotel_logger.info("LLM Call Started")
+    llm = get_llm()
     response = llm.invoke(prompt)
+    hotel_logger.info("LLM Call Completed")
+
     return response.content
 
 
-def parse_response(response):
-    """Convert JSON into python dictionary."""
+def hotel_agent(state: State) -> State:
     try:
-        return json.loads(response)
-    except Exception as exc:
-        raise ValueError("Invalid format recieved") from exc
+        hotel_logger.info("=" * 50)
+        hotel_logger.info("Hotel Agent Started")
+        hotel_logger.info("=" * 50)
+        hotel_logger.info(f"Reading state - Destination: {state['destination']}, Budget: {state['budget']}")
 
+        search_results = search_hotel(state)
 
-def hotel_agent(state: State):
-    search_results = search_hotel(state)
-    prompt = build_prompt(state, search_results)
-    response = ask_llm(prompt)
+        prompt = build_prompt(state, search_results)
 
-    hotel = parse_response(response)
-    state["hotel"] = hotel["hotel"]
-    state["hotel_cost"] = hotel["hotel_cost"]
-    return state
+        response = ask_llm(prompt)
+
+        hotel_logger.info("Parsing Started")
+        hotel_options = parse_json_response(response)
+        hotel_logger.info("Parsing Completed")
+
+        state["hotel_options"] = hotel_options[:MAX_HOTEL_OPTIONS]
+        state["hotel_cost"] = hotel_options[0].get("hotel_cost", 0.0) if hotel_options else 0.0
+
+        hotel_logger.info(f"State Updated - Hotel options count: {len(state['hotel_options'])}, Hotel cost: {state['hotel_cost']}")
+        hotel_logger.info("Hotel Agent Completed Successfully")
+        hotel_logger.info("=" * 50)
+
+        return state
+    except Exception as e:
+        hotel_logger.exception(f"Error in hotel_agent: {str(e)}")
+        raise

@@ -1,32 +1,27 @@
 import json
-import os
+from typing import Any
 
-from dotenv import load_dotenv
-from langchain_ollama import ChatOllama
-from tavily import TavilyClient
-
+from config.settings import (
+    MAX_TRAVEL_OPTIONS,
+    TAVILY_MAX_RESULTS,
+)
+from logger import travel_logger
+from prompts.travel_prompt import build_travel_prompt
 from state import State
-
-load_dotenv()
-
+from utils.parsers import parse_json_response
 
 
-TEMPERATURE = 0.2
-TOP_P = 0.9
-MAX_OUTPUT_TOKENS = 500
+def search_travel(state: State) -> dict[str, Any]:
+    from clients import get_tavily_client
 
-tavily = TavilyClient(
-    api_key=os.getenv("TAVILY_API_KEY"),
-)
+    travel_logger.info("=" * 50)
+    travel_logger.info("Travel Agent Started")
+    travel_logger.info("=" * 50)
+    travel_logger.info(f"Reading state - Source: {state['source']}, Destination: {state['destination']}, Budget: {state['budget']}")
+    travel_logger.info("Search Started")
 
-llm = ChatOllama(
-    model="qwen3:8b",
-    temperature=0,
-)
+    tavily_client = get_tavily_client()
 
-
-def search_travel(state: State):
-    """Search the travel options from the web."""
     query = f"""the best possible travel options to travel from {state["source"]} to {state["destination"]} for a budget of {state["budget"]} and a travel date of {state["travel_date"]}
 
 Include the following constraints in your search:
@@ -34,62 +29,66 @@ travel_mode
 approximation_price
 travel_duration
 """
-    response = tavily.search(query=query, max_results=10)
+    response = tavily_client.search(query=query, max_results=TAVILY_MAX_RESULTS)
+
+    travel_logger.info("Search Completed")
+    travel_logger.info(f"Search returned {len(response.get('results', []))} results")
+
     return response
 
 
-def build_prompt(state: State, search_results):
-    """Build a prompt for the LLM."""
-    prompt = f"""You are a travel agent. You have been given the user details kindly find the best possible trip for the user.
-User Details:
+def build_prompt(state: State, search_results: dict[str, Any]) -> str:
+    travel_logger.info("Prompt Building Started")
 
-Source:
-{state["source"]}
+    prompt = build_travel_prompt(
+        source=state["source"],
+        destination=state["destination"],
+        travel_date=state["travel_date"],
+        budget=state["budget"],
+        preferences=state["preferences"],
+        search_results=search_results
+    )
 
-destination:
-{state["destination"]}
-
-budget:
-{state["budget"]}
-
-travel_date:
-{state["travel_date"]}
-
-Search_Results:
-{search_results}
-
-Choose the best travel options according to the details which are provided to you above.
-return only JSON results
-
-Format:
-{{
-  "travel_mode": [],
-  "travel_expense": 0
-}}
-"""
+    travel_logger.info("Prompt Building Completed")
     return prompt
 
 
-def ask_llm(prompt):
-    """Send prompt to the llm."""
+def ask_llm(prompt: str) -> str:
+    from clients import get_llm
+
+    travel_logger.info("LLM Call Started")
+    llm = get_llm()
     response = llm.invoke(prompt)
+    travel_logger.info("LLM Call Completed")
+
     return response.content
 
 
-def parse_response(response):
-    """Convert JSON into python dictionary."""
+def travel_agent(state: State) -> State:
     try:
-        return json.loads(response)
-    except Exception as exc:
-        raise ValueError("invalid format recieved") from exc
+        travel_logger.info("=" * 50)
+        travel_logger.info("Travel Agent Started")
+        travel_logger.info("=" * 50)
+        travel_logger.info(f"Reading state - Source: {state['source']}, Destination: {state['destination']}, Budget: {state['budget']}")
 
+        search_results = search_travel(state)
 
-def travel_agent(state: State):
-    search_results = search_travel(state)
-    prompt = build_prompt(state, search_results)
-    response = ask_llm(prompt)
+        prompt = build_prompt(state, search_results)
 
-    travel = parse_response(response)
-    state["travel_mode"] = travel["travel_mode"]
-    state["travel_expense"] = travel["travel_expense"]
-    return state
+        response = ask_llm(prompt)
+
+        travel_logger.info("Parsing Started")
+        travel_options = parse_json_response(response)
+        travel_logger.info("Parsing Completed")
+
+        state["travel_options"] = travel_options[:MAX_TRAVEL_OPTIONS]
+        state["travel_expense"] = travel_options[0].get("travel_expense", 0.0) if travel_options else 0.0
+
+        travel_logger.info(f"State Updated - Travel options count: {len(state['travel_options'])}, Travel expense: {state['travel_expense']}")
+        travel_logger.info("Travel Agent Completed Successfully")
+        travel_logger.info("=" * 50)
+
+        return state
+    except Exception as e:
+        travel_logger.exception(f"Error in travel_agent: {str(e)}")
+        raise

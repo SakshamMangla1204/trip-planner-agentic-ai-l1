@@ -1,30 +1,26 @@
-import json
-import os
+from typing import Any
 
-from dotenv import load_dotenv
-from langchain_ollama import ChatOllama
-from tavily import TavilyClient
-
+from config.settings import (
+    MAX_FOOD_OPTIONS,
+    TAVILY_MAX_RESULTS,
+)
+from logger import food_logger
+from prompts.food_prompt import build_food_prompt
 from state import State
-
-load_dotenv()
-
-TEMPERATURE = 0.1
-TOP_P = 0.9
-MAX_OUTPUT_TOKENS = 500
-
-tavily = TavilyClient(
-    api_key=os.getenv("TAVILY_API_KEY"),
-)
-
-llm = ChatOllama(
-    model="qwen3:8b",
-    temperature=0,
-)
+from utils.parsers import parse_json_response
 
 
-def search_food(state: State):
-    """Search the web for the best food options for the trip."""
+def search_food(state: State) -> dict[str, Any]:
+    from clients import get_tavily_client
+
+    food_logger.info("=" * 50)
+    food_logger.info("Food Agent Started")
+    food_logger.info("=" * 50)
+    food_logger.info(f"Reading state - Destination: {state['destination']}, Preferences: {state['preferences']}")
+    food_logger.info("Search Started")
+
+    tavily_client = get_tavily_client()
+
     query = f"""Find the best possible food place for the user who is travelling from {state["source"]} to {state["destination"]} on {state["travel_date"]}.
 
 It is mandatory to include the checkpoints mentioned below:
@@ -34,61 +30,65 @@ food_type (veg/non-veg)
 food_quantity_to_quality_ratio
 food_place_review
 """
-    response = tavily.search(query=query, max_results=10)
+    response = tavily_client.search(query=query, max_results=TAVILY_MAX_RESULTS)
+
+    food_logger.info("Search Completed")
+    food_logger.info(f"Search returned {len(response.get('results', []))} results")
+
     return response
 
 
-def build_prompt(state: State, search_results):
-    """Build a prompt for the llm model."""
-    prompt = f"""You are an expert travel agent and a food vlogger. Kindly find the best possible food places from the web for the trip whose details are shared below.
+def build_prompt(state: State, search_results: dict[str, Any]) -> str:
+    food_logger.info("Prompt Building Started")
 
-Source:
-{state["source"]}
+    prompt = build_food_prompt(
+        source=state["source"],
+        destination=state["destination"],
+        travel_date=state["travel_date"],
+        preferences=state["preferences"],
+        search_results=search_results
+    )
 
-Destination:
-{state["destination"]}
-
-Travel date:
-{state["travel_date"]}
-
-Preferences:
-{state["preferences"]}
-
-Search results:
-{search_results}
-
-Choose the best possible food places according to the request of the user and help them find the best food options.
-Return only JSON.
-
-Format:
-{{
-  "food_options": [],
-  "food_budget": 0
-}}
-"""
+    food_logger.info("Prompt Building Completed")
     return prompt
 
 
-def ask_llm(prompt):
-    """Send the prompt to the llm."""
+def ask_llm(prompt: str) -> str:
+    from clients import get_llm
+
+    food_logger.info("LLM Call Started")
+    llm = get_llm()
     response = llm.invoke(prompt)
+    food_logger.info("LLM Call Completed")
+
     return response.content
 
 
-def parse_response(response):
-    """Convert JSON into a python dictionary."""
+def food_agent(state: State) -> State:
     try:
-        return json.loads(response)
-    except Exception as exc:
-        raise ValueError("Invalid format received") from exc
+        food_logger.info("=" * 50)
+        food_logger.info("Food Agent Started")
+        food_logger.info("=" * 50)
+        food_logger.info(f"Reading state - Destination: {state['destination']}, Preferences: {state['preferences']}")
 
+        search_results = search_food(state)
 
-def food_agent(state: State):
-    search_results = search_food(state)
-    prompt = build_prompt(state, search_results)
-    response = ask_llm(prompt)
+        prompt = build_prompt(state, search_results)
 
-    food = parse_response(response)
-    state["food"] = food.get("food", food.get("food_options", []))
-    state["food_cost"] = food.get("food_cost", food.get("food_budget", 0))
-    
+        response = ask_llm(prompt)
+
+        food_logger.info("Parsing Started")
+        food_options = parse_json_response(response)
+        food_logger.info("Parsing Completed")
+
+        state["food_options"] = food_options[:MAX_FOOD_OPTIONS]
+        state["food_cost"] = food_options[0].get("food_cost", food_options[0].get("food_budget", 0.0)) if food_options else 0.0
+
+        food_logger.info(f"State Updated - Food options count: {len(state['food_options'])}, Food cost: {state['food_cost']}")
+        food_logger.info("Food Agent Completed Successfully")
+        food_logger.info("=" * 50)
+
+        return state
+    except Exception as e:
+        food_logger.exception(f"Error in food_agent: {str(e)}")
+        raise
