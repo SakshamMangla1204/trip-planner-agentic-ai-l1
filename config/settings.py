@@ -6,7 +6,7 @@ LLM_MAX_OUTPUT_TOKENS: Final[int] = 500
 PRIMARY_PROVIDER: Final[str] = "groq"
 FALLBACK_PROVIDER: Final[str] = "mistral"
 
-GROQ_MODEL: Final[str] = "llama3-70b-8192"
+GROQ_MODEL: Final[str] = "llama-3.3-70b-versatile"
 
 MISTRAL_MODEL: Final[str] = "mistral-large-latest"
 

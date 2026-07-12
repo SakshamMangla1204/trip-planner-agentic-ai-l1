@@ -21,18 +21,10 @@ def search_activity(state: State) -> dict[str, Any]:
 
     tavily_client = get_tavily_client()
 
-    query = f"""Find the high rated and best possible,commonly done activities by the the visitors the destination entered by the user{state['destination']}
-     It is mandoatory to take care of the check points which are mentioned belo:
-     activity_name
-     activity_time
-     activity_type
-     activity_reveiw
-     activity_cost
-     activity_location
-     activity_duration
-     activity_safety
-     activity_tickets_availability
-    """
+    preferences_str = ", ".join(state["preferences"]) if state.get("preferences") else ""
+    query = f"top rated activities and things to do in {state['destination']} from {state['source']} on {state['travel_date']}"
+    if preferences_str:
+        query += f" for {preferences_str}"
     response = tavily_client.search(query=query, max_results=TAVILY_MAX_RESULTS)
 
     activity_logger.info("Search Completed")
@@ -63,6 +55,14 @@ def ask_llm(prompt: str) -> str:
     response = llm.invoke(prompt)
     activity_logger.info("LLM Call Completed")
 
+    print("=" * 50)
+    print("RAW LLM RESPONSE START")
+    print("=" * 50)
+    print(response.content)
+    print("=" * 50)
+    print("RAW LLM RESPONSE END")
+    print("=" * 50)
+
     return response.content
 
 
@@ -84,7 +84,7 @@ def activity_agent(state: State) -> State:
         activity_logger.info("Parsing Completed")
 
         state["activity_options"] = activity_options[:MAX_ACTIVITY_OPTIONS]
-        state["activities_cost"] = activity_options[0].get("activities_cost", activity_options[0].get("activity_price", 0.0)) if activity_options else 0.0
+        state["activities_cost"] = activity_options[0].get("activity_cost", 0.0) if activity_options else 0.0
 
         activity_logger.info(f"State Updated - Activity options count: {len(state['activity_options'])}, Activities cost: {state['activities_cost']}")
         activity_logger.info("Activity Agent Completed Successfully")

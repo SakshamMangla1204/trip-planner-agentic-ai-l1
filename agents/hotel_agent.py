@@ -61,6 +61,14 @@ def ask_llm(prompt: str) -> str:
     response = llm.invoke(prompt)
     hotel_logger.info("LLM Call Completed")
 
+    print("=" * 50)
+    print("RAW LLM RESPONSE START")
+    print("=" * 50)
+    print(response.content)
+    print("=" * 50)
+    print("RAW LLM RESPONSE END")
+    print("=" * 50)
+
     return response.content
 
 
@@ -82,7 +90,7 @@ def hotel_agent(state: State) -> State:
         hotel_logger.info("Parsing Completed")
 
         state["hotel_options"] = hotel_options[:MAX_HOTEL_OPTIONS]
-        state["hotel_cost"] = hotel_options[0].get("hotel_cost", 0.0) if hotel_options else 0.0
+        state["hotel_cost"] = hotel_options[0].get("hotel_price", 0.0) if hotel_options else 0.0
 
         hotel_logger.info(f"State Updated - Hotel options count: {len(state['hotel_options'])}, Hotel cost: {state['hotel_cost']}")
         hotel_logger.info("Hotel Agent Completed Successfully")

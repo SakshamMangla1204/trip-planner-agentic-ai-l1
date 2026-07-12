@@ -61,6 +61,14 @@ def ask_llm(prompt: str) -> str:
     response = llm.invoke(prompt)
     food_logger.info("LLM Call Completed")
 
+    print("=" * 50)
+    print("RAW LLM RESPONSE START")
+    print("=" * 50)
+    print(response.content)
+    print("=" * 50)
+    print("RAW LLM RESPONSE END")
+    print("=" * 50)
+
     return response.content
 
 
@@ -82,7 +90,7 @@ def food_agent(state: State) -> State:
         food_logger.info("Parsing Completed")
 
         state["food_options"] = food_options[:MAX_FOOD_OPTIONS]
-        state["food_cost"] = food_options[0].get("food_cost", food_options[0].get("food_budget", 0.0)) if food_options else 0.0
+        state["food_cost"] = food_options[0].get("food_price", 0.0) if food_options else 0.0
 
         food_logger.info(f"State Updated - Food options count: {len(state['food_options'])}, Food cost: {state['food_cost']}")
         food_logger.info("Food Agent Completed Successfully")

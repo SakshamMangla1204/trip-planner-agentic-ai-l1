@@ -61,6 +61,14 @@ def ask_llm(prompt: str) -> str:
     response = llm.invoke(prompt)
     travel_logger.info("LLM Call Completed")
 
+    print("=" * 50)
+    print("RAW LLM RESPONSE START")
+    print("=" * 50)
+    print(response.content)
+    print("=" * 50)
+    print("RAW LLM RESPONSE END")
+    print("=" * 50)
+
     return response.content
 
 
@@ -82,7 +90,7 @@ def travel_agent(state: State) -> State:
         travel_logger.info("Parsing Completed")
 
         state["travel_options"] = travel_options[:MAX_TRAVEL_OPTIONS]
-        state["travel_expense"] = travel_options[0].get("travel_expense", 0.0) if travel_options else 0.0
+        state["travel_expense"] = travel_options[0].get("estimated_cost", 0.0) if travel_options else 0.0
 
         travel_logger.info(f"State Updated - Travel options count: {len(state['travel_options'])}, Travel expense: {state['travel_expense']}")
         travel_logger.info("Travel Agent Completed Successfully")

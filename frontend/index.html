@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cosmic Navigator — AI Trip Planner</title>
+  <link href="style.css" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <canvas id="stars-canvas"></canvas>
+
+  <!-- Floating Glass Orbs -->
+  <div class="glass-orb orb-1"></div>
+  <div class="glass-orb orb-2"></div>
+  <div class="glass-orb orb-3"></div>
+
+  <div class="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="container">
+        <div class="logo">
+          <svg class="logo-svg" width="44" height="44" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <!-- Outer ring (compass) -->
+            <circle cx="22" cy="22" r="20" stroke="url(#logo-grad)" stroke-width="1.5" opacity="0.6"/>
+            <circle cx="22" cy="22" r="15" stroke="url(#logo-grad)" stroke-width="0.8" opacity="0.4"/>
+            <!-- Neural nodes on ring -->
+            <circle cx="22" cy="4" r="2.5" fill="#7C3AED"/>
+            <circle cx="22" cy="40" r="2.5" fill="#06B6D4"/>
+            <circle cx="4" cy="22" r="2.5" fill="#10B981"/>
+            <circle cx="40" cy="22" r="2.5" fill="#8B5CF6"/>
+            <!-- Connecting lines (neural paths) -->
+            <line x1="22" y1="4" x2="22" y2="22" stroke="#7C3AED" stroke-width="0.5" opacity="0.5"/>
+            <line x1="22" y1="22" x2="40" y2="22" stroke="#8B5CF6" stroke-width="0.5" opacity="0.5"/>
+            <line x1="22" y1="22" x2="4" y2="22" stroke="#10B981" stroke-width="0.5" opacity="0.5"/>
+            <line x1="22" y1="22" x2="22" y2="40" stroke="#06B6D4" stroke-width="0.5" opacity="0.5"/>
+            <!-- Center compass arrow -->
+            <path d="M22 10 L24.5 20 L22 18 L19.5 20 Z" fill="#F8FAFC" opacity="0.9"/>
+            <path d="M22 34 L19.5 24 L22 26 L24.5 24 Z" fill="#F8FAFC" opacity="0.9"/>
+            <!-- Center dot -->
+            <circle cx="22" cy="22" r="2" fill="#F8FAFC"/>
+            <!-- AI pulse dot -->
+            <circle cx="22" cy="22" r="6" fill="none" stroke="#7C3AED" stroke-width="0.3" opacity="0.3">
+              <animate attributeName="r" values="6;10;6" dur="3s" repeatCount="indefinite"/>
+              <animate attributeName="opacity" values="0.3;0;0.3" dur="3s" repeatCount="indefinite"/>
+            </circle>
+            <defs>
+              <linearGradient id="logo-grad" x1="0" y1="0" x2="44" y2="44">
+                <stop offset="0%" stop-color="#7C3AED"/>
+                <stop offset="50%" stop-color="#06B6D4"/>
+                <stop offset="100%" stop-color="#10B981"/>
+              </linearGradient>
+            </defs>
+          </svg>
+          <h1>Cosmic Navigator</h1>
+        </div>
+        <p class="subtitle">Your Multi-Agent AI Travel Planner — Compare flights, hotels, restaurants, attractions & budgets in one intelligent itinerary.</p>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main container">
+      <!-- Input Form -->
+      <section class="card form-card fade-in" id="form-section">
+        <div class="card-header">
+          <span class="card-icon">📋</span>
+          <h2>Trip Details</h2>
+        </div>
+        <form id="trip-form">
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="source"><span class="input-icon">📍</span> Source City</label>
+              <input type="text" id="source" placeholder="e.g. Delhi" required>
+            </div>
+            <div class="form-group">
+              <label for="destination"><span class="input-icon">📍</span> Destination City</label>
+              <input type="text" id="destination" placeholder="e.g. Goa" required>
+            </div>
+            <div class="form-group">
+              <label for="travel-date"><span class="input-icon">📅</span> Travel Date</label>
+              <input type="text" id="travel-date" placeholder="DD-MM-YYYY" required>
+            </div>
+            <div class="form-group">
+              <label for="budget"><span class="input-icon">💰</span> Budget (INR)</label>
+              <input type="number" id="budget" placeholder="e.g. 50000" min="0" step="0.01" required>
+            </div>
+          </div>
+          <div class="form-group full-width">
+            <label><span class="input-icon">🏷️</span> Preferences</label>
+            <div class="preferences-container">
+              <div class="preference-chips" id="preference-chips"></div>
+              <input type="text" id="preference-input" placeholder="Type & press Enter or click tags below..." autocomplete="off">
+              <div class="preference-tags" id="preference-tags">
+                <button type="button" class="tag" data-value="adventure">🏔️ Adventure</button>
+                <button type="button" class="tag" data-value="beach">🏖️ Beach</button>
+                <button type="button" class="tag" data-value="luxury">💎 Luxury</button>
+                <button type="button" class="tag" data-value="nature">🌿 Nature</button>
+                <button type="button" class="tag" data-value="food">🍜 Food</button>
+                <button type="button" class="tag" data-value="shopping">🛍️ Shopping</button>
+                <button type="button" class="tag" data-value="culture">🏛️ Culture</button>
+                <button type="button" class="tag" data-value="nightlife">🌙 Nightlife</button>
+              </div>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary" id="submit-btn">
+            <span class="btn-text">✈ Generate My Trip →</span>
+            <span class="btn-loader" style="display:none;">
+              <span class="spinner"></span> Generating...
+            </span>
+          </button>
+        </form>
+      </section>
+
+      <!-- Multi-Agent Progress Section -->
+      <section class="card agent-progress-card fade-in" id="agent-progress-section" style="display:none;">
+        <div class="card-header">
+          <span class="card-icon">🧠</span>
+          <h2>AI Agents Working</h2>
+        </div>
+        <div class="card-body">
+          <div class="agent-pipeline" id="agent-pipeline">
+            <div class="agent-step" data-agent="travel">
+              <div class="step-indicator">⏳</div>
+              <div class="step-content">
+                <span class="step-name">Travel Agent</span>
+                <span class="step-desc">Finding routes & fares</span>
+              </div>
+              <div class="step-status"></div>
+            </div>
+            <div class="pipeline-connector"></div>
+            <div class="agent-step" data-agent="hotel">
+              <div class="step-indicator">○</div>
+              <div class="step-content">
+                <span class="step-name">Hotel Agent</span>
+                <span class="step-desc">Searching accommodations</span>
+              </div>
+              <div class="step-status"></div>
+            </div>
+            <div class="pipeline-connector"></div>
+            <div class="agent-step" data-agent="food">
+              <div class="step-indicator">○</div>
+              <div class="step-content">
+                <span class="step-name">Food Agent</span>
+                <span class="step-desc">Discovering restaurants</span>
+              </div>
+              <div class="step-status"></div>
+            </div>
+            <div class="pipeline-connector"></div>
+            <div class="agent-step" data-agent="activity">
+              <div class="step-indicator">○</div>
+              <div class="step-content">
+                <span class="step-name">Activity Agent</span>
+                <span class="step-desc">Finding attractions</span>
+              </div>
+              <div class="step-status"></div>
+            </div>
+            <div class="pipeline-connector"></div>
+            <div class="agent-step" data-agent="budget">
+              <div class="step-indicator">○</div>
+              <div class="step-content">
+                <span class="step-name">Budget Agent</span>
+                <span class="step-desc">Calculating totals</span>
+              </div>
+              <div class="step-status"></div>
+            </div>
+          </div>
+          <div class="agent-progress-bar">
+            <div class="agent-progress-fill" id="agent-progress-fill"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Results Section -->
+      <section class="results-section fade-in" id="results-section" style="display:none;">
+        <!-- Workflow Indicator -->
+        <div class="workflow-indicator" id="workflow-indicator">
+          <div class="workflow-step completed" data-step="travel">
+            <span class="wf-icon">✔</span>
+            <span class="wf-label">Travel</span>
+          </div>
+          <div class="wf-connector completed"></div>
+          <div class="workflow-step completed" data-step="hotel">
+            <span class="wf-icon">✔</span>
+            <span class="wf-label">Hotel</span>
+          </div>
+          <div class="wf-connector completed"></div>
+          <div class="workflow-step completed" data-step="food">
+            <span class="wf-icon">✔</span>
+            <span class="wf-label">Food</span>
+          </div>
+          <div class="wf-connector completed"></div>
+          <div class="workflow-step completed" data-step="activity">
+            <span class="wf-icon">✔</span>
+            <span class="wf-label">Activities</span>
+          </div>
+          <div class="wf-connector completed"></div>
+          <div class="workflow-step completed" data-step="budget">
+            <span class="wf-icon">✔</span>
+            <span class="wf-label">Budget</span>
+          </div>
+        </div>
+
+        <!-- Summary -->
+        <div class="card summary-card" id="summary-card">
+          <div class="card-header">
+            <span class="card-icon">📊</span>
+            <h2>Trip Summary</h2>
+          </div>
+          <div class="summary-grid" id="summary-grid"></div>
+        </div>
+
+        <!-- Travel Options -->
+        <div class="card option-section" id="travel-card" data-color="cyan">
+          <div class="card-header">
+            <span class="card-icon">🚆</span>
+            <h2>Travel Options</h2>
+          </div>
+          <div class="card-body" id="travel-body"></div>
+        </div>
+
+        <!-- Hotel Options -->
+        <div class="card option-section" id="hotel-card" data-color="purple">
+          <div class="card-header">
+            <span class="card-icon">🏨</span>
+            <h2>Hotel Options</h2>
+          </div>
+          <div class="card-body" id="hotel-body"></div>
+        </div>
+
+        <!-- Food Options -->
+        <div class="card option-section" id="food-card" data-color="orange">
+          <div class="card-header">
+            <span class="card-icon">🍽️</span>
+            <h2>Food Options</h2>
+          </div>
+          <div class="card-body" id="food-body"></div>
+        </div>
+
+        <!-- Activities -->
+        <div class="card option-section" id="activities-card" data-color="green">
+          <div class="card-header">
+            <span class="card-icon">🎯</span>
+            <h2>Activities</h2>
+          </div>
+          <div class="card-body" id="activities-body"></div>
+        </div>
+
+        <!-- Final Plan -->
+        <div class="card final-plan-card" id="final-plan-card">
+          <div class="card-header">
+            <span class="card-icon">📜</span>
+            <h2>Final Itinerary</h2>
+          </div>
+          <div class="card-body" id="final-plan-body"></div>
+        </div>
+
+        <button class="btn btn-secondary" id="plan-another-btn">
+          ← Plan Another Trip
+        </button>
+      </section>
+
+      <!-- Error Section -->
+      <section class="card error-card fade-in" id="error-section" style="display:none;">
+        <div class="error-content">
+          <span class="error-icon">⚠️</span>
+          <h3>Something went wrong</h3>
+          <p id="error-message"></p>
+          <button class="btn btn-secondary" id="retry-btn">Try Again</button>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="container">
+        <p class="footer-tech">Powered by <strong>LangGraph</strong> • <strong>Groq</strong> • <strong>Tavily</strong> • <strong>FastAPI</strong></p>
+        <p>&copy; 2026 Cosmic Navigator</p>
+      </div>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
